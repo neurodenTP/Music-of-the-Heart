@@ -220,6 +220,8 @@ fourier_filter(ppg, 'data', biosignal_sr, 0.1, 10)
 # Строим графики во всем временном диапазоне
 plot_raw_data(eeg_fp1, eeg_fp2, ppg, music_data, music_sr, recording_time, 'data_filtered', 10, 11)
 
+
+
 # biosignal_metrics = preprocess_biosignals(raw_biosignals)
 # emotional_state = extract_emotional_state(biosignal_metrics)
 # notes = extract_notes(music_file)
