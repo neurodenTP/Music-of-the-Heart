@@ -222,6 +222,7 @@ plot_raw_data(eeg_fp1, eeg_fp2, ppg, music_data, music_sr, recording_time, 'data
 
 
 nb jb
+xzx
 # biosignal_metrics = preprocess_biosignals(raw_biosignals)
 # emotional_state = extract_emotional_state(biosignal_metrics)
 # notes = extract_notes(music_file)
