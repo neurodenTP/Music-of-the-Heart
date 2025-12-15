@@ -123,7 +123,6 @@ class Biosignal():
         self.ppg['cleaned'] = nk.ppg_clean(self.ppg['filtered'], sampling_rate=self.ppg_sr)
         print("PPG очистка: ", 100 * self.ppg['cleaned'].isna().sum() / len(self.ppg), " %")
         
-
     def calc_ppg_metrics(self, window_duration=60, step_duration=30):
         """
          Вычисление метрик PPG скользящим окном для оценки эмоционального состояния.
@@ -205,10 +204,10 @@ class Biosignal():
                     'PPG_Rate': ppg_rate_window,
                     'HRV_MeanNN': hrv_time.get('HRV_MeanNN', pd.NA),
                     'HRV_SDNN': hrv_time.get('HRV_SDNN', pd.NA),
-                    'HRV_RMSSD': hrv_time.get('HRV_RMSSD', pd.NA),
-                    'HRV_LF': hrv_frequency.get('HRV_LF', pd.NA),
-                    'HRV_HF': hrv_frequency.get('HRV_HF', pd.NA),
-                    'HRV_LFHF': hrv_frequency.get('HRV_LFHF', pd.NA)
+                    'HRV_RMSSD': hrv_time.get('HRV_RMSSD', pd.NA)#,
+                    # 'HRV_LF': hrv_frequency.get('HRV_LF', pd.NA),
+                    # 'HRV_HF': hrv_frequency.get('HRV_HF', pd.NA),
+                    # 'HRV_LFHF': hrv_frequency.get('HRV_LFHF', pd.NA)
                 }
                 metrics_data.append(row_data)
                 
@@ -217,7 +216,7 @@ class Biosignal():
             
             time_start += step_duration
         
-        self.ppg_metrics = pd.DataFrame(metrics_data)
+        self.ppg_metrics = pd.DataFrame(metrics_data).astype(float)
 
     def plot_ppg_metrics(self):
         """
@@ -230,16 +229,17 @@ class Biosignal():
             print("Метрики не найдены. Выполните calc_ppg_metrics() сначала.")
             return
     
-        metrics = ['PPG_Rate', 'HRV_MeanNN', 'HRV_SDNN', 'HRV_RMSSD', 'HRV_LF', 'HRV_HF', 'HRV_LFHF']
+        # metrics = ['PPG_Rate', 'HRV_MeanNN', 'HRV_SDNN', 'HRV_RMSSD', 'HRV_LF', 'HRV_HF', 'HRV_LFHF']
+        metrics = self.ppg_metrics.columns
         plt.figure(figsize=(14, 10))
     
         for i, metric in enumerate(metrics, 1):
-            if metric in self.ppg_metrics.columns:
-                plt.subplot(len(metrics), 1, i)
-                plt.plot(self.ppg_metrics['time'], self.ppg_metrics[metric], marker='o', linestyle='-')
-                plt.title(metric)
-                plt.xlabel('Time (s)')
-                plt.grid(True)
+            # if metric in self.ppg_metrics.columns:
+            plt.subplot(len(metrics), 1, i)
+            plt.plot(self.ppg_metrics['time'], self.ppg_metrics[metric], marker='o', linestyle='-')
+            plt.title(metric)
+            plt.xlabel('Time (s)')
+            plt.grid(True)
     
         plt.tight_layout()
         plt.show()
@@ -259,6 +259,9 @@ class Biosignal():
         АСИММЕТРИЯ (Fp1 vs Fp2):
         - Alpha_Asymmetry: (Fp1_Alpha - Fp2_Alpha)/(Fp1_Alpha + Fp2_Alpha)
           Отрицательные значения = позитивный valence (Fp2>Fp1)
+          
+        ВОВЛЕЧЕННОСТЬ
+        - engagement: (Fp1_Beta/Fp1_Alpha + Fp2_Beta/Fp2_Alpha) / 2
         
         HJORTH ПАРАМЕТРЫ:
         - Hjorth_Mobility: скорость изменений сигнала (↑ = активность)
@@ -314,6 +317,10 @@ class Biosignal():
                 asymmetries = {f'{name}_Asymmetry': asymmetry(fp1_power[f'Fp1_{name}'], fp2_power[f'Fp2_{name}']) 
                               for name in band_names}
                 
+                # ВОВЛЕЧЕННОСТЬ
+                engagement =  (fp1_power['Fp1_Beta']/fp1_power['Fp1_Alpha'] + 
+                               fp2_power['Fp2_Beta']/fp2_power['Fp2_Alpha']) / 2
+                
                 # Hjorth параметры
                 def hjorth_params(signal):
                     signal = signal[~np.isnan(signal)]
@@ -334,6 +341,7 @@ class Biosignal():
                     **{k: v.iloc[0] for k, v in fp1_power.items()},
                     **{k: v.iloc[0] for k, v in fp2_power.items()},
                     **asymmetries,
+                    'Engagement': engagement,
                     'Fp1_Hjorth_Mobility': fp1_mobility,
                     'Fp1_Hjorth_Complexity': fp1_complexity,
                     'Fp2_Hjorth_Mobility': fp2_mobility,
@@ -390,7 +398,7 @@ class Biosignal():
         plt.show()
         
         # Figure 2: Асимметрия + Hjorth
-        fig2, axes2 = plt.subplots(3, 1, figsize=(14, 12))
+        fig2, axes2 = plt.subplots(4, 1, figsize=(14, 12))
         
         # Асимметрия ритмов
         ax3 = axes2[0]
@@ -402,6 +410,7 @@ class Biosignal():
         ax3.axhline(y=0, color='black', linestyle='--', alpha=0.5)
         ax3.legend()
         ax3.grid(True, alpha=0.3)
+        
         
         # Hjorth параметры Fp1
         ax4 = axes2[1]
@@ -426,6 +435,16 @@ class Biosignal():
         ax5.legend()
         ax5.grid(True, alpha=0.3)
         
+        # Вовлеченность
+        ax6 = axes2[3]
+        ax6.plot(self.eeg_metrics['time'], self.eeg_metrics['Engagement'], 
+                label='Engagement', linewidth=2, color='blue')
+        ax6.set_title('Вовлеченность', fontsize=14, fontweight='bold')
+        ax6.set_xlabel('Время (с)')
+        ax6.set_ylabel('Значение')
+        ax6.legend()
+        ax6.grid(True, alpha=0.3)        
+        
         plt.tight_layout()
         plt.show()
         
@@ -439,34 +458,77 @@ class Biosignal():
                 numeric_df[col] = df[col]
         return numeric_df
     
-    def calc_state(self, time_step=5):
+    def calc_state(self, time_step, model):
+        
         """Интерполяция метрик на временную ось от 0 до recording_time"""
         interp_times = np.arange(0, self.recording_time + time_step/2, time_step)
         
-        interp_values = self.ppg_metrics.drop(columns='time').apply(lambda col: np.interp(interp_times, self.ppg_metrics['time'], col))
-        interp_values['time'] = interp_times
-        ppg_interp = interp_values[['time'] + [col for col in interp_values.columns if col != 'time']]
+        interp = self.ppg_metrics.set_index('time')
+        interp = interp.reindex(interp.index.union(interp_times))
+        interp = interp.interpolate(method='index').ffill().bfill()
+        ppg_interp = interp.loc[interp_times].reset_index()
         
-        # Интерполяция
-        ppg_interp_raw = self.ppg_metrics.reindex(interp_times).interpolate(method='linear', limit_direction='both')
-        eeg_interp_raw = self.eeg_metrics.reindex(interp_times).interpolate(method='linear', limit_direction='both')
+        interp = self.eeg_metrics.set_index('time')
+        interp = interp.reindex(interp.index.union(interp_times))
+        interp = interp.interpolate(method='index').ffill().bfill()
+        eeg_interp = interp.loc[interp_times].reset_index()
         
-        print(ppg_interp_raw)
-        ppg_interp = self.extract_numeric(ppg_interp_raw)
-        eeg_interp = self.extract_numeric(eeg_interp_raw)
+        # Общая таблица
+        metrics_df = pd.merge(ppg_interp, eeg_interp, on='time', how='outer')
+        metrics_df = metrics_df.sort_values('time').reset_index(drop=True)
         
-        print(ppg_interp)
+        def compute_scale(scale_cfg, row):
+            total = scale_cfg.get('bias', 0.0)
+            for metric_name, params in scale_cfg['metrics'].items():
+                mean = params['mean']
+                std = params['std']
+                weight = params['weight']
+                value = row[metric_name]
+                z = (value - mean) / std
+                total += weight * z
+            return total
         
-        # Теперь безопасно приводим к float
-        for df in [ppg_interp, eeg_interp]:
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            df.dropna(axis=1, how='all', inplace=True)
-            df.fillna(df.median(), inplace=True)
+        valence_values = []
+        arousal_values = []
         
-        self.ppg_interp = ppg_interp
-        self.eeg_interp = eeg_interp
-        self.interp_times = interp_times
+        for _, row in metrics_df.iterrows():
+            valence_values.append(compute_scale(model['valence'], row))
+            arousal_values.append(compute_scale(model['arousal'], row))
         
-        print(self.ppg_interp)
+        self.state_metrics = pd.DataFrame({
+            'time': metrics_df['time'],
+            'valence': valence_values,
+            'arousal': arousal_values
+        }).astype(float)
+
+    def plot_state(self, time_start=0, time_stop=None):
+        if time_stop is None:
+            time_stop = self.recording_time
+    
+        df = self.state_metrics
+        mask = (df['time'] >= time_start) & (df['time'] <= time_stop)
+        df = df.loc[mask]
+    
+        fig, axes = plt.subplots(2, 1, figsize=(10, 8))
+    
+        # 1) Временные ряды возбуждения и валентности
+        axes[0].plot(df['time'], df['arousal'], label='Arousal', linewidth=2, color='tab:orange')
+        axes[0].plot(df['time'], df['valence'], label='Valence', linewidth=2, color='tab:blue')
+        axes[0].axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        axes[0].set_ylabel('Score (a.u.)')
+        axes[0].set_title('Time Courses of Arousal and Valence')
+        axes[0].grid(True, alpha=0.3)
+        axes[0].legend()
+    
+        # 2) Точки на плоскости (валентность по X, возбуждение по Y)
+        axes[1].scatter(df['valence'], df['arousal'], c=df['time'], cmap='viridis', s=20)
+        axes[1].axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        axes[1].axvline(x=0, color='black', linestyle='--', alpha=0.5)
+        axes[1].set_xlabel('Valence')
+        axes[1].set_ylabel('Arousal')
+        axes[1].set_title('Arousal–Valence Plane (color = time)')
+        axes[1].grid(True, alpha=0.3)
+    
+        plt.tight_layout()
+        plt.show()  
         
